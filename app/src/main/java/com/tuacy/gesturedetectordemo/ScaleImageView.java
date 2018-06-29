@@ -6,6 +6,7 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.support.v7.widget.AppCompatImageView;
 import android.util.AttributeSet;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.ViewTreeObserver;
@@ -20,6 +21,7 @@ public class ScaleImageView extends AppCompatImageView
 	private Matrix               mMatrix;
 	private boolean              mFirstLayout;
 	private float                mBaseScale;
+	private GestureDetector      mGestureDetector;//用来抓双击事件
 
 
 	public ScaleImageView(Context context) {
@@ -36,6 +38,7 @@ public class ScaleImageView extends AppCompatImageView
 		mMatrix = new Matrix();
 		setScaleType(ScaleType.MATRIX);
 		mFirstLayout = true;
+		mGestureDetector = new GestureDetector(context, mSimpleOnGestureListener);
 	}
 
 	@Override
@@ -53,7 +56,11 @@ public class ScaleImageView extends AppCompatImageView
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		return mScaleGestureDetector.onTouchEvent(event);
+		if (mGestureDetector.onTouchEvent(event)) {
+			return true;
+		}
+		mScaleGestureDetector.onTouchEvent(event);
+		return true;
 	}
 
 	/**
@@ -192,4 +199,49 @@ public class ScaleImageView extends AppCompatImageView
 		}
 		mMatrix.postTranslate(deltaX, deltaY);
 	}
+
+	private GestureDetector.SimpleOnGestureListener mSimpleOnGestureListener = new GestureDetector.SimpleOnGestureListener() {
+
+		@Override
+		public boolean onDoubleTap(MotionEvent e) {
+			if (null == getDrawable() || mMatrix == null) {
+				return true;
+			}
+			// 每次点击我们假设放大到1.2倍。
+			float scaleFactor = 1.2f;
+			float scale = getScale();
+			// 控件图片的缩放范围
+			if (scale < mBaseScale * MAX_SCALE_TIME) {
+				if (scale * scaleFactor < mBaseScale) {
+					scaleFactor = mBaseScale / scale;
+				}
+				if (scale * scaleFactor > mBaseScale * MAX_SCALE_TIME) {
+					scaleFactor = mBaseScale * MAX_SCALE_TIME / scale;
+				}
+				// 以屏幕中央位置进行缩放
+				mMatrix.postScale(scaleFactor, scaleFactor, e.getX(), e.getY());
+				borderAndCenterCheck();
+				setImageMatrix(mMatrix);
+			}
+			return true;
+		}
+
+		@Override
+		public boolean onDown(MotionEvent e) {
+			return true;
+		}
+
+		@Override
+		public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+			if (e1.getPointerCount() == e2.getPointerCount() && e1.getPointerCount() == 1) {
+				mMatrix.postTranslate(-distanceX, -distanceY);
+				borderAndCenterCheck();
+				setImageMatrix(mMatrix);
+				return true;
+			}
+			return super.onScroll(e1, e2, distanceX, distanceY);
+		}
+	};
+
+
 }
